@@ -1,0 +1,1177 @@
+<template>
+  <div
+    class="page"
+    @swipe="back"
+    style="background-color: black; justify-content: center; align-items: center"
+  >
+    <stack class="page" @click="nextDialogue">
+      <!-- 背景滚动区域 -->
+      <stack class="page">
+        <scroll
+          if="{{ !evMode }}"
+          id="bgScroll"
+          scroll-x="true"
+          style="width: 192px; height: 490px"
+        >
+          <image style="height: 490px; min-width: 300px" src="/common/{{ Img }}.png"></image>
+        </scroll>
+
+        <image
+          if="{{ evMode }}"
+          style="height: 490px; width: 192px"
+          src="/common/{{ Img }}.png"
+        ></image>
+      </stack>
+      <!-- 前景（立绘）-->
+      <stack
+        class="page"
+        show="{{ currentImgPaths.length !== 0 || bgScrollEnabled }}"
+        style="
+          flex-direction: column;
+          flex-wrap: nowrap;
+          justify-content: center;
+          align-items: center;
+        "
+      >
+        <image style="width: 192px" for="currentImgPaths" src="/common/{{ $item }}.png" />
+      </stack>
+
+      <!-- 文本框 -->
+      <stack style="width: 192px; top: 315px">
+        <!-- 角色名 -->
+        <div style="width: 192px; flex-direction: column">
+          <text
+            style="font-size: 28px;                     
+            color: rgb({{ settings.color[0] }},{{ settings.color[1] }},{{ settings.color[2] }});                     
+            font-weight: bold;                     
+            width: 192px;                     
+            height:32px"
+            if="{{ !showChoices && Img !== 'bg.png' }}"
+          >
+            {{ character }}
+          </text>
+          <!-- 对话文字（滚动） -->
+          <scroll
+            scroll-y="true"
+            bounces="true"
+            class="scroll"
+            id="scroll"
+            if="{{ !showChoices && Img !== 'bg.png' }}"
+          >
+            <text
+              style="color: rgb({{ settings.color[0] }},{{ settings.color[1] }},{{ settings.color[2] }});                    
+              font-weight: 700;width: 100%;text-align: left;                    
+              font-size: {{ settings.textSize }}px;padding-bottom:65px"
+            >
+              {{ showText }}
+            </text>
+          </scroll>
+        </div>
+      </stack>
+    </stack>
+
+    <!-- 选项页 -->
+    <div
+      class="page"
+      style="
+        position: absolute;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        justify-content: center;
+        align-items: center;
+      "
+      if="{{ showChoices }}"
+    >
+      <text for="choiceList" class="choice" @click="selectChoice($idx)">
+        {{ $item.text }}
+      </text>
+    </div>
+
+    <!-- 菜单页 -->
+    <scroll
+      class="page set"
+      scroll-y="true"
+      bounces="true"
+      style="
+        position: absolute;
+        flex-wrap: nowrap;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+        background-color: #000000;
+        padding: 65px 0px;
+      "
+      if="{{ menu }}"
+    >
+      <text class="menu-btn" @click="quickSave()">快速存档</text>
+      <text class="menu-btn" @click="quickRecoveryPage()">快速读档</text>
+      <text class="menu-btn" @click="lastScene(1)">上个场景</text>
+      <text class="menu-btn" @click="skipScene(1)">下个场景</text>
+      <text class="menu-btn" @click="skipChapter()">下个章节</text>
+      <text class="menu-btn" @click="toRecoveryPage(1)">保存存档</text>
+      <text class="menu-btn" @click="toRecoveryPage(2)">加载存档</text>
+      <!-- 新增：背景滚动开关 -->
+      <text class="menu-btn" @click="toggleBgScroll()">
+        {{ bgScrollEnabled ? "关闭背景滚动" : "开启背景滚动" }}
+      </text>
+      <text class="menu-btn" @click="back('c')">返回游戏</text>
+      <text class="menu-btn" @click="back('e')">返回主页</text>
+    </scroll>
+
+    <!-- 保存存档界面 -->
+    <scroll
+      class="page set"
+      scroll-y="true"
+      bounces="true"
+      style="
+        position: absolute;
+        padding: 65px 0px;
+        background-color: #000000;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        align-items: center;
+      "
+      if="{{ recovery === 1 }}"
+      @swipe="back()"
+    >
+      <text class="menu-btn" style="font-size: 18px">长按丢掉！点击篡位！</text>
+      <text
+        class="menu-btn"
+        for="{{ recoveryData }}"
+        style="font-size: 24px"
+        @click="saveRecoveryData($idx)"
+        @longpress="deleteRecoveryData($idx)"
+      >
+        保存的存档{{ $idx + 1 }}
+      </text>
+      <text class="menu-btn" style="font-size: 25px" @click="saveRecoveryData('new')">
+        新创建一个存档
+      </text>
+    </scroll>
+
+    <scroll
+      class="page set"
+      scroll-y="true"
+      bounces="true"
+      style="
+        position: absolute;
+        background-color: #000000;
+        padding: 65px 0px;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        align-items: center;
+      "
+      if="{{ recovery === 2 }}"
+      @swipe="back()"
+    >
+      <text class="menu-btn" style="font-size: 20px">点击享受记忆瞬间！</text>
+      <text
+        class="menu-btn"
+        for="{{ recoveryData }}"
+        style="font-size: 24px"
+        @click="loadRecoveryData($idx)"
+        @longpress="consoleData($idx)"
+      >
+        保存的存档{{ $idx + 1 }}
+      </text>
+    </scroll>
+  </div>
+</template>
+
+<script>
+import router from "@system.router"
+import storage from "@system.storage"
+import prompt from "@system.prompt"
+import file from "@system.file"
+import vibrator from "@system.vibrator"
+const scnChartInfo = {
+  flagkeys: ["koh", "len", "mak", "mur", "rok", "sub", "yos"],
+
+  flags: {
+    koh: [["s507*sub_part_7_sel", 1, 1]],
+    len: [
+      ["s010*com_part_10_sel", 1, 1],
+      ["s010*010_02A_sel", 2, 1]
+    ],
+    mak: [
+      ["s006*com_part_6_sel", 2, 1],
+      ["s010*010_01com_sel", 2, 1]
+    ],
+    mur: [
+      ["s010*010_01com_sel", 3, 1],
+      ["s010*010_02com_sel", 2, 1]
+    ],
+    rok: [["s507*sub_part_7_sel", 2, 1]],
+    sub: [
+      ["s001*com_part_1_sel", 1, 1],
+      ["s012*com_part_12_sel", 2, 1]
+    ],
+    yos: [
+      ["s010*010_02A_sel", 1, 1],
+      ["s014*com_part_14_sel", 1, 1]
+    ]
+  }
+}
+const ENDconfig = [
+{
+    file: "015・ノーマルend",
+    Img: "END_normal",
+    text: "标准结局"
+  },{
+    file: "114・芳乃－ＥＰ",
+    Img: "thum_ED芳乃",
+    text: "芳乃线结局"
+  },{
+    file: "210・茉子－エピローグ",
+    Img: "thum_ED茉子",
+    text: "茉子线结局"
+  },{
+    file: "316・ムラサメちゃんルート１６",
+    Img: "thum_EDムラサメ",
+    text: "丛雨线结局"
+  },{
+    file: "428レナ・未来への祭祀",
+    Img: "thum_EDレナ",
+    text: "蕾娜线结局"
+  },{
+    file: "512・サブ－小春（その後）",
+    Img: "thum_ED小春",
+    text: "小春线结局"
+  },{
+    file: "522・サブ－芦花（その後）",
+    Img: "thum_ED芦花",
+    text: "芦花线结局"
+  }
+]
+let program = []
+export default {
+  private: {
+    // ---------- 指令虚拟机 ----------
+    pc: 0,
+    callStack: [],
+    // ---------- 运行时状态 ----------
+    currentBg: "bg",
+    currentImgPaths: [],
+    currentImgTop: 0,
+    currentImgLeft: 0,
+    pendingState:{},
+    showChoices: false,
+    choiceList: [],
+    pendingChoiceCmd: null,
+    branchFlags: {},
+    // ---------- 对话显示 ----------
+    dialogueQueue: [],
+    currentDialogueIdx: 0,
+    canContinue: true,
+    showText: "",
+    character: "",
+    index: 0,
+    typein: false,
+    timer: null,
+    load: null,
+    // ---------- 游戏全局 ----------
+    chapter: 0,
+    currentFile: "001・アーサー王.txt",
+    chapterList: ["001・アーサー王"],
+    choiceHistory: [],
+    END: false,
+    evMode: false,
+    sdMode: false,
+    globalFlags: {checkAnyClear: false},
+    // ---------- UI 辅助 ----------
+    Img: "bg_set",
+    menu: false,
+    recovery: 0,
+    recoveryData: [],
+    quick: null,
+    settings: {
+      textSpeed: 40,
+      textSize: 22,
+      bzz: true,
+      color: [255, 255, 255]
+    },
+    // ---------- 背景滚动相关 ----------
+    bgScrollEnabled: true, // 是否启用自动滚动
+    bgScrollSpeed: 1, // 每次移动像素（可调整）
+    bgScrollTimer: null, // 定时器ID
+    bgScrollLeft: 0, // 当前滚动位置（0~645，因为图片宽845-视口192=653）
+    bgScrollDirection: 1, // 1: 向右, -1: 向左
+    bgScroll: null
+  },
+
+  onInit() {
+    // 读取设置
+    storage.get({
+      key: "settings",
+      success: (data) => {
+        if (data) this.settings = JSON.parse(data)
+      }
+    })
+    // 读取存档列表
+    storage.get({
+      key: "recoveryData",
+      success: (data) => {
+        if (data) this.recoveryData = JSON.parse(data)
+        storage.get({
+          key: "qS",
+          success: (d) => {
+            if (d) this.quick = JSON.parse(d)
+          }
+        })
+        if (this.load) {
+          this.pendingState = this.recoveryData[this.load]
+          this.loadData(this.pendingState.currentFile)
+        } else {
+          this.loadData(this.chapter)
+        }
+      },
+      fail: () => {
+        this.loadData(this.chapter)
+      }
+    })
+    //读取全局旗标
+    storage.get({
+      key: "globalFlags",
+      default: JSON.stringify(this.globalFlags),
+      success: (data) => {
+        if (data) this.globalFlags = JSON.parse(data)
+      }
+    })
+  },
+
+  onDestroy() {
+    this.stopBgScroll() // 销毁时停止滚动
+  },
+
+  // ---------- 背景滚动控制 ----------
+  startBgScroll() {
+    if (!this.bgScrollEnabled) return
+    if (this.bgScrollTimer) clearInterval(this.bgScrollTimer)
+    this.bgScroll = this.$element("bgScroll").scrollTo
+    this.bgScrollTimer = setInterval(() => {
+      if (!this.bgScrollEnabled) {
+        clearInterval(this.bgScrollTimer)
+        this.bgScrollTimer = null
+        return
+      }
+      if (this.evMode) {
+        this.bgScroll = null
+        return
+      }
+      // 更新滚动位置
+      let newLeft = this.bgScrollLeft + this.bgScrollSpeed * this.bgScrollDirection
+      const maxLeft = 68
+      if (newLeft <= 20) {
+        newLeft = 20
+        this.bgScrollDirection = 1 // 掉头向右
+      } else if (newLeft >= maxLeft) {
+        newLeft = maxLeft
+        this.bgScrollDirection = -1 // 掉头向左
+      }
+      this.bgScrollLeft = newLeft
+      try {
+        // 应用到滚动组件
+        if (!this.bgScroll) {
+          console.log("bgScroll 未实例")
+          this.bgScroll = this.$element("bgScroll")
+          if (this.bgScroll) {
+            this.bgScroll = this.bgScroll.scrollTo
+          } else {
+            this.bgScroll = null
+          }
+        }
+
+        this.bgScroll({left: this.bgScrollLeft, top: 0, behavior: "instant"})
+      } catch (error) {
+        this.bgScroll = null
+      }
+    }, 60) // 约33fps，可调整
+  },
+  //--------------相关函数-----------
+  UpdateBranchFlags(dic = this.branchFlags) {
+    for (let key of scnChartInfo.flagkeys) {
+      delete dic[key]
+      let table = scnChartInfo.flags[key]
+      if (!table) continue
+      let value = 0
+      for (let item of table) {
+        const [condFlag, expected, add] = item
+        if ((dic[condFlag] ?? 0) == expected) {
+          value += add
+        }
+      }
+      if (value !== 0) dic[key] = value
+    }
+  },
+  SetBranchFlags(key, value) {
+    if (key === "") return
+    if (key.startsWith(".")) {
+      this.globalFlags[key.slice(1)] = value
+    } else {
+      this.branchFlags[key] = value
+    }
+    this.UpdateBranchFlags() // 添加这一行
+  },
+  //--------------------------------
+  CheckBranchFlags(exp, context) {
+    // 递归去除外层包装
+    let inner = exp
+    const wrapper = inner.match(/^CheckBranchFlags\(["'](.+?)["']\)$/)
+    if (wrapper) inner = wrapper[1]
+
+    // 更新复合标志
+    this.UpdateBranchFlags(this.branchFlags)
+
+    // 替换点号全局变量为实际值
+    let processed = inner
+    if (processed.includes(".checkAnyClear")) {
+      const val = this.globalFlags.checkAnyClear ? "true" : "false"
+      processed = processed.replace(/\.checkAnyClear/g, val)
+    }
+
+    // 分割 && 或 ||
+    if (processed.includes("&&")) {
+      const parts = processed.split(/\s*&&\s*/)
+      for (let p of parts) if (!this._evalSimple(p)) return false
+      return true
+    }
+    if (processed.includes("||")) {
+      const parts = processed.split(/\s*\|\|\s*/)
+      for (let p of parts) if (this._evalSimple(p)) return true
+      return false
+    }
+    return this._evalSimple(processed)
+  },
+
+  _evalSimple(exp) {
+    const m = exp.match(/^([a-zA-Z0-9_*]+)\s*(==|!=|>|<|>=|<=)\s*(\d+)$/)
+    if (!m) {
+      console.warn("无法解析条件:", exp)
+      return false
+    }
+    const left = this.branchFlags[m[1]] ?? 0
+    const op = m[2]
+    const right = parseInt(m[3], 10)
+    switch (op) {
+      case "==":
+        return left == right
+      case "!=":
+        return left != right
+      case ">":
+        return left > right
+      case "<":
+        return left < right
+      case ">=":
+        return left >= right
+      case "<=":
+        return left <= right
+      default:
+        return false
+    }
+  },
+  stopBgScroll() {
+    if (this.bgScrollTimer) {
+      clearInterval(this.bgScrollTimer)
+      this.bgScrollTimer = null
+    }
+  },
+
+  toggleBgScroll() {
+    this.bgScrollEnabled = !this.bgScrollEnabled
+    if (this.bgScrollEnabled) {
+      this.startBgScroll()
+      if (this.settings.bzz) vibrator.vibrate({mode: "short"})
+    } else {
+      this.stopBgScroll()
+      if (this.settings.bzz) vibrator.vibrate({mode: "short"})
+    }
+  },
+
+  // ---------- 指令执行核心（基本保持不变，只增加了滚动重启动） ----------
+  loadData(fileNameOrKey) {
+    if (this.settings.bzz) vibrator.vibrate({mode: "short"})
+
+    // 如果传入的是索引，转换为文件名；如果是字符串，直接使用
+    let targetFile = fileNameOrKey
+    if (typeof fileNameOrKey === "number") {
+      targetFile = this.chapterList[fileNameOrKey] + ".txt"
+    }
+    this.currentFile = targetFile // 更新当前文件
+
+    file.readText({
+      uri: `/common/${targetFile}`,
+      success: (data) => {
+        program = JSON.parse(data.text)
+        // 如果传入了待恢复的状态，则恢复；否则从开头开始
+        if (this.pendingState && Object.keys(this.pendingState).length !== 0) {
+          const state = this.pendingState
+          this.pendingState = null
+          this.pc = state.pc
+          this.callStack = state.callStack || []
+          this.currentBg = state.currentBg
+          this.currentImgPaths = state.currentImgPath || []
+          this.choiceHistory = state.choiceHistory || []
+          this.bgScrollEnabled = state.bgScrollEnabled !== undefined ? state.bgScrollEnabled : true
+          this.bgScrollLeft = state.bgScrollLeft || 0
+          this.bgScrollDirection = state.bgScrollDirection || 1
+          this.branchFlags = state.branchFlags
+          this.Img = this.currentBg
+          this.stopBgScroll()
+          if (this.bgScrollEnabled) this.startBgScroll()
+          this.pendingState = undefined
+          this.executeCurrent()
+        } else {
+          this.pc = 0
+          this.callStack = []
+          this.currentBg = "bg"
+          this.currentImgPaths = []
+          this.showChoices = false
+          this.dialogueQueue = []
+          this.currentDialogueIdx = 0
+          this.END = false
+          this.Img = this.currentBg
+          this.stopBgScroll()
+          if (this.bgScrollEnabled) this.startBgScroll()
+          this.executeCurrent()
+        }
+      },
+      fail: (code) => console.log(`加载失败 ${code}`)
+    })
+  },
+
+  executeCurrent() {
+    if (this.END) return
+    if (this.pc >= program.length) {
+      return
+    }
+    const instr = program[this.pc]
+    switch (instr.type) {
+      case "dialogue":
+        this.handleDialogue(instr)
+        break
+      case "label":
+        this.pc++
+        this.executeCurrent()
+        break
+      case "goto":
+        // 如果有 file 字段且不为空/None，则跨文件跳转
+        if (instr.file && instr.file !== "null" && instr.file !== "") {
+          // 注意：goto 指令可能没有 label 字段，target 就是 label
+          this.loadExternalFile(instr.file, instr.target)
+        } else {
+          this.jumpToLabel(instr.target)
+        }
+        break
+      case "choice": // 保留旧版兼容
+      case "choice_f": // 保留旧版兼容
+        this.handleChoice(instr)
+        break
+      case "choices": // 新增：新版选项
+        this.handleChoices(instr)
+        break
+      case "branch": // 新增：条件分支
+        this.handleBranch(instr)
+        break
+      case "loop":
+        this.handleLoop(instr.label)
+        break
+      default:
+        console.warn("未知指令", instr.type)
+        this.pc++
+        this.executeCurrent()
+    }
+  },
+  findLabelIndex(targetLabel) {
+    for (let i = 0; i < program.length; i++) {
+      const instr = program[i]
+      if (instr.type === "label" && instr.name === targetLabel) {
+        return i
+      }
+    }
+    return -1 // 未找到
+  },
+  handleChoices(block) {
+    this.choiceList = block.options.map((opt) => ({text: opt.text}))
+    this.showChoices = true
+    this.pendingChoiceCmd = block // 注意 block.type 现在是 "choices"
+  },
+
+  findNextChoiceOrEnd(startPc) {
+    let pc = startPc
+    const visited = new Set()
+    const MAX_STEPS = 5000
+
+    for (let step = 0; step < MAX_STEPS; step++) {
+      if (pc >= program.length) return pc
+
+      const instr = program[pc]
+
+      // 遇到选项 -> 停下
+      if (instr.type === "choice" || instr.type === "choice_f" || instr.type === "choices") {
+        return pc
+      }
+
+      // 同文件 goto -> 跟随跳转
+      if (instr.type === "goto" && (!instr.file || instr.file === "null" || instr.file === "")) {
+        if (visited.has(pc)) return pc
+        visited.add(pc)
+        const target = this.findLabelIndex(instr.target)
+        pc = target !== -1 ? target : pc + 1
+        continue
+      }
+
+      // 跨文件 goto -> 无法继续扫描，返回当前指令
+      if (
+        (instr.type === "goto" && instr.file && instr.file !== "null" && instr.file !== "") ||
+        instr.type === "goto_f"
+      ) {
+        return pc
+      }
+
+      // ***** 关键修正：branch 指令 *****
+      if (instr.type === "branch") {
+        let found = false
+        for (let branch of instr.branches) {
+          let ok = false
+          if (branch.condition) {
+            ok = this.CheckBranchFlags(branch.condition)
+          } else {
+            ok = true // 无条件分支（默认分支）
+          }
+          if (ok) {
+            // 如果分支跨文件，则无法继续扫描
+            if (branch.file && branch.file !== "null" && branch.file !== "") {
+              return pc
+            }
+            // 否则跳转到目标标签
+            if (branch.target) {
+              const targetPc = this.findLabelIndex(branch.target)
+              if (targetPc !== -1) {
+                pc = targetPc
+                found = true
+                break
+              }
+            }
+          }
+        }
+        if (!found) {
+          // 无任何分支匹配，结束扫描
+          return program.length
+        }
+        continue // 继续从新位置扫描
+      }
+
+      // 其他指令（label, dialogue, loop 等）-> 跳过
+      pc++
+    }
+    return pc
+  },
+  handleDialogue(block) {
+    if (block.background) {
+      this.currentBg = block.background
+      if (block.background.startsWith("ev")) {
+        this.evMode = true
+        this.currentBg = `ev/${block.background}`
+      } else {
+        this.evMode = false
+      }
+      this.Img = this.currentBg
+    }
+    if (block.Img) {
+      const parts = block.Img.split("_")
+      if (parts.length >= 3) {
+        this.sdMode = false
+        const faceCode = parts[1].slice(4)
+        const dressName = parts[2]
+        this.currentImgPaths = [
+          `assets/${parts[0]}a/dress/${dressName}`,
+          `assets/${parts[0]}a/face/${faceCode}`
+        ]
+      } else if (block.Img.startsWith("sd")) {
+        this.sdMode = true
+        this.currentImgPaths = [`sd/${block.Img.toUpperCase()}`]
+      }
+      this.currentImgTop = block.ImgTop || 0
+      this.currentImgLeft = block.ImgLeft || 0
+    } else {
+      this.sdMode = false
+      this.currentImgPaths = []
+    }
+    this.dialogueQueue = block.dialogues.slice()
+    this.currentDialogueIdx = 0
+    this.showNextDialogue()
+  },
+
+  // ---------- 对话显示 ----------
+  showNextDialogue() {
+    if (this.currentDialogueIdx >= this.dialogueQueue.length) {
+      this.pc++
+      this.executeCurrent()
+      return
+    }
+    const line = this.dialogueQueue[this.currentDialogueIdx]
+    this.currentDialogueIdx++ // 索引移动到下一句（下次调用时使用）
+    this.character = line.character
+    this.showText = ""
+    this.canContinue = false
+    this.index = 0
+    this.typein = false
+    // 修复：传 false，正常开始逐字打印
+    this.typewriter(line.text, false)
+  },
+
+  typewriter(text, userClick = false) {
+    if (!text || text.length === 0) {
+      this.showText = ""
+      this.index = 0
+      this.typein = false
+      this.canContinue = true
+      return
+    }
+
+    if (this.index < text.length) {
+      // 修复：只要用户点击就立即全部显示，不再要求 this.typein
+      if (userClick) {
+        clearTimeout(this.timer)
+        this.showText = text
+        this.index = text.length
+        this.typein = false
+        this.canContinue = true
+        return
+      }
+      // 正常逐字
+      this.typein = true
+      this.showText += text.charAt(this.index)
+      this.index++
+      clearTimeout(this.timer)
+      this.timer = setTimeout(() => this.typewriter(text), this.settings.textSpeed)
+    } else {
+      // 已经打完
+      this.typein = false
+      this.canContinue = true
+      // 自动播放（如果需要）
+      if (!userClick && this.isAutoing) {
+        this.autoTimer = setTimeout(() => this.nextPage(), this.autoPlayDelay)
+      }
+    }
+  },
+
+  nextDialogue() {
+    if (this.settings.bzz) vibrator.vibrate({mode: "short"})
+    if (this.showChoices) return
+    if (this.END) return
+    if (!this.canContinue) {
+      // 当前正在打字，点击后立即完成当前句
+      if (this.currentDialogueIdx > 0) {
+        const curLine = this.dialogueQueue[this.currentDialogueIdx - 1]
+        if (curLine) {
+          this.typewriter(curLine.text, true) // 强制跳过
+        } else {
+          this.canContinue = true
+        }
+      } else {
+        this.canContinue = true
+      }
+      return
+    }
+
+    // 可以继续，显示下一句
+    this.scrollToTop()
+    this.showNextDialogue()
+  },
+
+  jumpToLabel(labelName) {
+    for (let i = 0; i < program.length; i++) {
+      if (
+        program[i].type === "label" &&
+        (program[i].name === labelName || program[i].name === `[goto:${labelName}]`)
+      ) {
+        this.pc = i
+        this.executeCurrent()
+        return
+      }
+    }
+    console.log("未找到标签", labelName)
+    this.pc++
+    this.executeCurrent()
+  },
+  loadExternalFile(fileName, startLabel) {
+    const realFile = fileName.replace(/\.json$/, "").replace(/\.txt$/, "") + ".txt"
+    const baseName = realFile.replace(/\.(txt|ks)$/, "")
+    const stdCurrentFile =this.currentFile.replace(/\.(txt|ks)$/, "")
+    // 检查是否为结局文件
+    const endEntry = ENDconfig.find((entry) => entry.file === stdCurrentFile)
+
+    // 若结局文件为 start.ks，标记已通关（全局标志）
+    if (baseName === "start") {
+      this.globalFlags.checkAnyClear = true
+      storage.set({
+        key: "globalFlags",
+        value: JSON.stringify(this.globalFlags)
+      })
+
+      // 显示结局
+      this.END = true
+      this.canContinue = false
+      this.currentImgPaths = endEntry.Img ? [endEntry.Img] : []
+      this.character = ""
+      this.showText = endEntry.text || "END"
+      // 如果需要在结局后返回标题或退出，可在此添加逻辑
+      return
+    }
+
+    this.currentFile = realFile
+    file.readText({
+      uri: `/common/${realFile}`,
+      success: (data) => {
+        program = JSON.parse(data.text)
+        this.pc = 0
+        if (startLabel) {
+          this.jumpToLabel(startLabel)
+        } else {
+          this.executeCurrent()
+        }
+      },
+      fail: () => console.log("跨文件加载失败", fileName)
+    })
+  },
+
+  handleChoice(block) {
+    this.choiceList = block.choices.map((opt) => ({text: opt.text}))
+    this.showChoices = true
+    this.pendingChoiceCmd = block
+  },
+
+  selectChoice(choiceIndex) {
+    if (this.settings.bzz) vibrator.vibrate({mode: "short"})
+    this.choiceHistory.push(choiceIndex)
+    this.showChoices = false
+    const cmd = this.pendingChoiceCmd
+    if (!cmd) return
+
+    // 新版 choices
+    if (cmd.type === "choices") {
+      const option = cmd.options[choiceIndex]
+      // 【关键】执行选项的 exp 表达式
+      if (option.exp) {
+        this.executeExpression(option.exp)
+      }
+      if (option.file) {
+        this.loadExternalFile(option.file, option.target)
+      } else if (option.target) {
+        this.jumpToLabel(option.target)
+      } else {
+        this.pc++
+        this.executeCurrent()
+      }
+    }
+    // 旧版 choice / choice_f（同样需要处理 exp，如果有的话）
+    else if (cmd.type === "choice" || cmd.type === "choice_f") {
+      const choice = cmd.choices[choiceIndex]
+      // 旧版可能也有 exp 字段（根据实际数据）
+      if (choice.exp) {
+        this.executeExpression(choice.exp)
+      }
+      if (cmd.type === "choice") {
+        this.jumpToLabel(choice.text)
+      } else if (cmd.type === "choice_f") {
+        if (choice.goto_f) {
+          this.loadExternalFile(choice.goto_f, choice.label || null)
+        } else {
+          console.error("choice_f 缺少 goto_f")
+          this.pc++
+          this.executeCurrent()
+        }
+      }
+    }
+    this.pendingChoiceCmd = null
+  },
+
+  // 辅助方法：执行表达式
+  executeExpression(exp) {
+    // 匹配 SetBranchFlags("key", value)
+    const match = exp.match(/^SetBranchFlags\(["'](.+?)["'],\s*(\d+)\)$/)
+    if (match) {
+      const key = match[1]
+      const value = parseInt(match[2], 10)
+      this.SetBranchFlags(key, value)
+      return
+    }
+    // 如果将来有其他格式（例如 f.xxx = yyy），可以继续添加匹配规则
+    console.warn("无法解析的 exp:", exp)
+  },
+  handleBranch(block) {
+    for (let branch of block.branches) {
+      let ok = false
+      if (branch.condition) {
+        ok = this.CheckBranchFlags(branch.condition)
+      } else {
+        ok = true // 无条件分支作为默认
+      }
+      if (ok) {
+        if (branch.file) {
+          this.loadExternalFile(branch.file, branch.target)
+        } else if (branch.target) {
+          this.jumpToLabel(branch.target)
+        } else {
+          this.pc++
+          this.executeCurrent()
+        }
+        return
+      }
+    }
+    // 无分支匹配，继续下一条指令
+    this.pc++
+    this.executeCurrent()
+  },
+  handleLoop(label) {
+    this.callStack.push(this.pc + 1)
+    this.jumpToLabel(label)
+  },
+
+  // ---------- 用户交互 ----------
+
+  back(a) {
+    if (a.direction === "right" || a === "c") {
+      if (this.settings.bzz) vibrator.vibrate({mode: "short"})
+      if (this.recovery !== 0) this.recovery = 0
+      else if (this.menu) this.menu = false
+      else this.menu = true
+    } else if (a === "e") {
+      if (this.settings.bzz) vibrator.vibrate({mode: "short"})
+      global.runGC()
+      router.back({uri: "/pages/index"})
+    }
+  },
+
+  lastScene(a) {
+    if (this.pc > 0) {
+      this.pc -= a
+      if (this.pc < 0) this.pc = 0
+      this.executeCurrent()
+      this.menu = false
+    } else {
+      prompt.showToast({message: "已经到开头了无法往前"})
+    }
+  },
+
+  skipScene(a) {
+    if (this.settings.bzz) vibrator.vibrate({mode: "short"})
+
+    let newPc = this.pc + 1
+    let visited = new Set() // 防止 goto 循环
+    const MAX_STEPS = 5000 // 安全闸，避免意外死循环
+
+    for (let steps = 0; steps < MAX_STEPS; steps++) {
+      if (newPc >= program.length) break
+      const instr = program[newPc]
+
+      // 找到了下一个对话块
+      if (instr.type === "dialogue") {
+        this.pc = newPc
+        break
+      }
+
+      if (instr.type === "goto" && (!instr.file || instr.file === "null" || instr.file === "")) {
+        // 同文件跳转，跟随
+        if (visited.has(newPc)) break
+        visited.add(newPc)
+        this.jumpToLabel(instr.target)
+        newPc = this.pc
+        continue
+      }
+      if (
+        (instr.type === "goto" && instr.file && instr.file !== "null" && instr.file !== "") ||
+        instr.type === "goto_f"
+      ) {
+        // 跨文件跳转，停在当前指令，由 executeCurrent 处理
+        this.pc = newPc
+        break
+      }
+
+      newPc++
+    }
+
+    // 正常情况 newPc 已指向一个 dialogue 块，执行它
+    this.executeCurrent()
+    this.menu = false
+  },
+
+  skipChapter() {
+    if (this.settings.bzz) vibrator.vibrate({mode: "short"})
+
+    const targetPc = this.findNextChoiceOrEnd(this.pc)
+    if (targetPc !== this.pc) {
+      this.pc = targetPc
+    }
+    this.executeCurrent()
+    this.menu = false
+  },
+
+  // ---------- 存档 / 读档 ----------
+  toRecoveryPage(a) {
+    if (this.settings.bzz) vibrator.vibrate({mode: "short"})
+    this.recovery = a
+  },
+
+  saveRecoveryData(idx) {
+    if (this.settings.bzz) vibrator.vibrate({mode: "short"})
+    const state = {
+      currentFile: this.currentFile,
+      pc: this.pc,
+      callStack: this.callStack,
+      currentBg: this.currentBg,
+      currentImgPath: this.currentImgPaths,
+      choiceHistory: this.choiceHistory,
+      bgScrollEnabled: this.bgScrollEnabled,
+      bgScrollLeft: this.bgScrollLeft,
+      bgScrollDirection: this.bgScrollDirection,
+      branchFlags: this.branchFlags
+    }
+    if (idx === "new") {
+      this.recoveryData.push(state)
+      prompt.showToast({message: "成功保存存档"})
+    } else {
+      this.recoveryData[idx] = state
+      prompt.showToast({message: "成功覆盖存档"})
+    }
+    this.saveData()
+  },
+
+  quickSave() {
+    if (this.settings.bzz) vibrator.vibrate({mode: "short"})
+    const state = {
+      currentFile: this.currentFile,
+      pc: this.pc,
+      callStack: this.callStack,
+      currentBg: this.currentBg,
+      currentImgPath: this.currentImgPaths,
+      choiceHistory: this.choiceHistory,
+      bgScrollEnabled: this.bgScrollEnabled,
+      bgScrollLeft: this.bgScrollLeft,
+      bgScrollDirection: this.bgScrollDirection,
+      branchFlags: this.branchFlags
+    }
+    storage.set({
+      key: "qS",
+      value: JSON.stringify(state),
+      success: () => prompt.showToast({message: "已快速存档"})
+    })
+    storage.set({
+      key: "globalFlags",
+      value: JSON.stringify(this.globalFlags)
+    })
+  },
+  deleteRecoveryData(idx) {
+    vibrator.vibrate({mode: "long"})
+    this.recoveryData.splice(idx, 1)
+    this.saveData()
+    prompt.showToast({message: "成功删除存档"})
+  },
+
+  loadRecoveryData(idx) {
+    if (this.settings.bzz) vibrator.vibrate({mode: "short"})
+    const state = this.recoveryData[idx]
+    if (!state) return
+
+    this.pendingState = state
+    this.recovery = 0
+    this.menu = false
+
+    // 如果存档中有 currentFile，直接加载该文件；否则兼容旧版 chapter 索引
+    const fileToLoad = state.currentFile || this.chapterList[state.chapter] + ".txt"
+    this.loadData(fileToLoad)
+  },
+
+  quickRecoveryPage() {
+    if (!this.quick) return
+    this.pendingState = this.quick
+    this.recovery = 0
+    this.menu = false
+    const fileToLoad = this.quick.currentFile || this.chapterList[this.quick.chapter] + ".txt"
+    this.loadData(fileToLoad)
+  },
+  saveData() {
+    storage.set({
+      key: "recoveryData",
+      value: JSON.stringify(this.recoveryData)
+    })
+    storage.set({
+      key: "globalFlags",
+      value: JSON.stringify(this.globalFlags)
+    })
+  },
+
+  consoleData(idx) {
+    console.log("存档数据", this.recoveryData[idx])
+  },
+
+  scrollToTop() {
+    this.$element("scroll").scrollTo({top: 0, behavior: "instant"})
+  },
+
+  getFin(a) {},
+  saveFin(a) {}
+}
+</script>
+
+<style>
+image {
+  width: 192px;
+}
+.page {
+  width: 192px;
+  height: 490px;
+}
+.scroll {
+  width: 192px;
+  height: 147px;
+  flex-wrap: wrap;
+  flex-direction: column;
+  background-image: url("/common/text_bg.png");
+}
+.scroll1 {
+  position: absolute;
+  bottom: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  overflow: hidden;
+  flex-wrap: nowrap;
+  flex-direction: column;
+  align-items: center;
+}
+.choice {
+  width: 160px;
+  height: 61px;
+  background-color: rgba(247, 126, 197, 0.651);
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: bold;
+  text-align: center;
+  border: 2px solid rgba(201, 64, 148, 0.5);
+  border-radius: 20px;
+  margin: 20px;
+  box-shadow: 6px 6px 8px 5px rgba(0, 0, 0, 0.2);
+}
+.menu-btn {
+  width: 180px;
+  height: 61px;
+  background-color: rgba(247, 126, 197, 0.651);
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 20px;
+  border: 2px solid rgba(201, 64, 148, 0.5);
+  border-radius: 20px;
+  margin: 5px;
+  box-shadow: 6px 6px 8px 5px rgba(0, 0, 0, 0.2);
+}
+.set {
+  background-size: cover;
+  background-image: url("/common/bg_set.png");
+}
+</style>

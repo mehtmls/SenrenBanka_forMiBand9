@@ -1,0 +1,606 @@
+<template>
+  <div class="root">
+    <swiper
+      id="main"
+      class="root"
+      indicator="false"
+      duration="100"
+      enableswipe="{{ isTwoMenu && pages!=='cgView' }}"
+      @change="onPageChange"
+    >
+      <!-- ========== 主菜单页 ========== -->
+      <div class="page">
+        <image src="/common/bg.png" class="page-bg" />
+        <div class="flex-center" style="z-index: 1">
+          <!-- 主菜单按钮列表 -->
+          <div class="btn-list">
+            <input class="btn" type="button" value="·-- 关 于 --·" @click="showPage('about')" />
+            <input class="btn" type="button" value="·-- 开 始 --·" @click="toPage('detail')" />
+            <input class="btn" type="button" value="·-- 加 载 --·" @click="showPage('rec')" />
+            <input class="btn" type="button" value="·-- 设 置 --·" @click="showPage('set')" />
+            <input class="btn" type="button" value="·-- 鉴 赏 --·" @click="showPage('cg')" />
+            <input class="btn" type="button" value="·-- 退 出 --·" @click="exit" />
+          </div>
+        </div>
+      </div>
+      <stack class="page">
+        <!-- ========== 设置页 ========== -->
+        <div class="page" if="{{ pages==='set' }}">
+          <image src="/common/bg_set.png" class="page-bg" />
+          <scroll scroll-y="true" class="page-scroll" bounces>
+            <div class="safearea"></div>
+            <block show="{{ !changing || nowChange==0 }}">
+              <div class="setting-group">
+                <text class="setting-label">调整字体大小</text>
+                <text class="setting-value">{{ settings.textSize }}px</text>
+              </div>
+              <slider
+                class="slider"
+                min="10"
+                max="40"
+                step="1"
+                onchange="changeTextSize()"
+                @touchmove="
+                  () => {
+                    changing = true
+                    nowChange = 0
+                  }
+                "
+                @touchend="
+                  () => {
+                    changing = false
+                    nowChange = -1
+                  }
+                "
+              />
+            </block>
+            <block show="{{ !changing || nowChange==1 }}">
+              <div class="setting-group">
+                <text class="setting-label">调整显示延迟</text>
+                <text class="setting-value">{{ settings.textSpeed }}ms</text>
+              </div>
+              <slider
+                class="slider"
+                min="5"
+                max="100"
+                step="5"
+                onchange="changeTextSpeed()"
+                @touchmove="
+                  () => {
+                    changing = true
+                    nowChange = 1
+                  }
+                "
+                @touchend="
+                  () => {
+                    changing = false
+                    nowChange = -1
+                  }
+                "
+              />
+            </block>
+            <block show="{{ !changing }}">
+              <div class="setting-group">
+                <text class="setting-label">振动反馈</text>
+                <switch
+                  style="width: 72px; height: 36px"
+                  checked="{{ settings.bzz }}"
+                  @change="buzz()"
+                />
+              </div>
+
+              <div
+                class="setting-group"
+                @click="
+                  () => {
+                    if (choise < colorList.length - 1) choise++
+                    else choise = 0
+                    settings.color = colorList[choise].list
+                  }
+                "
+              >
+                <text class="setting-label">文字颜色</text>
+                <text class="setting-value">{{ colorList[choise].name }}</text>
+              </div>
+            </block>
+            <text
+              style="width:192px;      
+            font-size:{{ settings.textSize }}px;      
+            color:rgb({{ settings.color[0] }},{{ settings.color[1] }},{{ settings.color[2] }})"
+            >
+              {{ showText }}
+            </text>
+            <div class="safearea"></div>
+          </scroll>
+          <!-- 顶部固定栏 -->
+          <div
+            class="top-bar"
+            style="
+              flex-direction: row;
+              flex-wrap: wrap;
+              justify-content: space-between;
+              height: 70px;
+            "
+          >
+            <text class="top-title" style="width: 100%; text-align: center">设置</text>
+            <image src="/common/Back_B.png" style="width:60px" class="top-btn" @click="onBack" />
+            <image src="/common/Check_B.png" style="width:60px" class="top-btn" @click="saveSettings" />
+          </div>
+        </div>
+
+        <!-- ========== 关于页 ========== -->
+        <div class="page" if="{{ pages==='about' }}">
+          <image src="/common/bg_set.png" class="page-bg" />
+          <scroll bounces scroll-y="true" class="page-scroll">
+            <div class="safearea"></div>
+            <div class="about-card">
+              <text class="about-title">千恋万花</text>
+              <text class="about-ver">1.91.9810 (For 9)</text>
+            </div>
+            <div class="about-card" style="align-items: center">
+              <text class="about-dev-title">参与的开发人员</text>
+              <div class="dev-row">
+                <text class="dev-name">@liuyuze61</text>
+                <image src="/common/about/2.png" style="width: 32px; height: 32px" />
+              </div>
+              <div class="dev-row">
+                <text class="dev-name">@ppyycc</text>
+                <image src="/common/about/1.png" style="width: 32px; height: 32px" />
+              </div>
+              <div class="dev-row">
+                <text class="dev-name">@无源流沙</text>
+                <image src="/common/about/4.png" style="width: 32px; height: 32px" />
+              </div>
+              <div class="dev-row">
+                <text class="dev-name">@淘汰郎</text>
+              </div>
+            </div>
+            <div class="safearea"></div>
+          </scroll>
+          <div class="top-bar">
+            <image src="/common/Back_B.png" class="top-btn" @click="onBack" />
+            <text class="top-title">关于</text>
+          </div>
+        </div>
+
+        <!-- ========== 存档/读档页 ========== -->
+        <div class="page" if="{{ pages==='rec' }}">
+          <image src="/common/bg_set.png" class="page-bg" />
+          <scroll bounces scroll-y="true" class="page-scroll">
+            <div class="safearea"></div>
+            <text class="menu-btn">点击读取你的记忆存档</text>
+            <text class="menu-btn" for="{{ recoveryData }}" @click="loadRecoveryData($idx)">
+              存档 {{ $idx + 1 }}
+            </text>
+            <div class="safearea"></div>
+          </scroll>
+        </div>
+
+        <!-- ========== CG 鉴赏页 ========== -->
+        <div class="page" if="{{ pages==='cg' }}">
+          <image src="/common/bg_set.png" class="page-bg" />
+          <scroll scroll-y="true" bounces class="page-scroll">
+            <div class="safearea"></div>
+            <text class="menu-btn">点击查看心爱的老婆！</text>
+            <text class="menu-btn" for="{{ cgList }}" @click="lookCg(cgList[$idx])">
+              · CG {{ $idx + 1 }} ·
+            </text>
+
+            <text class="menu-btn" style="font-size: 24px" @click="pushMoreCheck">
+              流连忘返地回到主页
+            </text>
+            <text
+              class="menu-btn"
+              for="{{ ssList }}"
+              @click="lookCg(ssList[$idx])"
+              if="{{ ssChick > 50 }}"
+            >
+              · CG {{ $idx + 1000 }} ·
+            </text>
+            <text class="menu-btn" @click="onBack">返回主页</text>
+            <div class="safearea"></div>
+          </scroll>
+        </div>
+        <div class="page" if="{{ pages==='cgView' }}">
+          <scroll
+            class="page"
+            style="flex-direction: column"
+            scroll-x
+            scroll-y
+            bounces
+            @click="showPage('cg')"
+          >
+            <div class="safearea"></div>
+            <image src="/common/cg/{{ willShow }}.png" />
+            <div class="safearea"></div>
+          </scroll>
+        </div>
+      </stack>
+    </swiper>
+    <!-- ========== 提示弹窗 ========== -->
+    <div
+      class="flex-center"
+      style="
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 192px;
+        height: 490px;
+        background-color: rgba(0, 0, 0, 0.7);
+        z-index: 10;
+      "
+      if="{{ tips }}"
+    >
+      <div class="tips-box">
+        <text class="font24">在"设置"中调整显示速度和文字大小</text>
+        <text class="font24">游戏中右滑进入菜单，左滑返回</text>
+        <text class="font24" style="color: red">请勿反复点击开始！耐心等待加载</text>
+        <text class="font24" @click="closeTips()" style="margin-top: 10px; color: #c31781">
+          我已知晓
+        </text>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import router from "@system.router"
+import storage from "@system.storage"
+import prompt from "@system.prompt"
+import vibrator from "@system.vibrator"
+
+export default {
+  private: {
+    mainPage: true,
+    pages: "main",
+    pagesLeft: 0,
+    showMain: false,
+    isTwoMenu: false,
+    recoveryData: [],
+    settings: {
+      textSpeed: 0,
+      textSize: 20,
+      bzz: true,
+      color: [255, 255, 255]
+    },
+    showText: "",
+    index: 0,
+    tips: false,
+    willShow: 0,
+    cgList: [1, 2, 3, 4, 5, 6],
+    ssList: [999, 998, 997, 996, 995],
+    ssChick: 0,
+    colorList: [
+      {name: "黄", list: [112, 197, 0]},
+      {name: "绿", list: [122, 219, 43]},
+      {name: "白", list: [255, 255, 255]},
+      {name: "黑", list: [0, 0, 0]},
+      {name: "肉", list: [128, 179, 123]}
+    ],
+    choise: 0,
+    showX: 0,
+    changing: false,
+    nowChange: 3,
+  },
+  onInit() {
+    storage.get({
+      key: "recoveryData",
+      success: (data) => {
+        if (data) this.recoveryData = JSON.parse(data)
+      }
+    })
+    storage.get({
+      key: "settings",
+      success: (data) => {
+        if (data) this.settings = JSON.parse(data)
+      }
+    })
+    storage.get({
+      key: "tips",
+      success: (data) => {
+        if (data) {
+          if (JSON.parse(data) !== 61) this.tips = true
+        } else this.tips = true
+      },
+      fail: () => {
+        this.tips = true
+      }
+    })
+  },
+
+  showPage(sth) {
+    if (this.settings.bzz) vibrator.vibrate({mode: "short"})
+    if (sth === "rec" && this.recoveryData.length <= 0) return
+    this.pages = sth
+    this.isTwoMenu = true
+    if (sth === "set") this.zhuzi()
+    setTimeout(() => {
+      this.$element("main").swipeTo({index: 1})
+    }, 0)
+  },
+  onBack() {
+    setTimeout(() => {
+      this.$element("main").swipeTo({index: 0})
+    }, 0)
+  },
+  onPageChange(e) {
+    if (e.index === 0) this.isTwoMenu = false
+  },
+  lookCg(sth) {
+    if (this.settings.bzz) vibrator.vibrate({mode: "short"})
+    this.willShow = sth
+    this.showPage("cgView")
+  },
+  toPage(page) {
+    if (this.settings.bzz) vibrator.vibrate({mode: "short"})
+    router.push({uri: `pages/${page}`})
+  },
+  exit() {
+    if (this.settings.bzz) vibrator.vibrate({mode: "short"})
+    this.$app.exit()
+  },
+  loadRecoveryData(idx) {
+    if (this.settings.bzz) vibrator.vibrate({mode: "short"})
+    router.push({uri: "pages/detail", params: {load: idx}})
+  },
+  changeTextSize(e) {
+    if (this.settings.bzz) vibrator.vibrate({mode: "short"})
+    this.settings.textSize = e.progress
+  },
+  changeTextSpeed(e) {
+    if (this.settings.bzz) vibrator.vibrate({mode: "short"})
+    this.settings.textSpeed = e.progress
+  },
+  showXChange(e) {
+    if (this.settings.bzz) vibrator.vibrate({mode: "short"})
+    this.showX = e.progress
+  },
+  zhuzi() {
+    const text = `QLWH好玩不\nABCDEFGHIJ\n您的支持即为今天！`
+    if (this.index < text.length) {
+      this.showText += text.charAt(this.index)
+      this.index++
+      setTimeout(() => {
+        this.zhuzi()
+      }, this.settings.textSpeed)
+    } else {
+      if (this.pages === "set") {
+        setTimeout(() => {
+          this.index = 0
+          this.showText = ""
+          this.zhuzi()
+        }, 2000)
+      }
+    }
+  },
+  saveSettings() {
+    if (this.settings.bzz) vibrator.vibrate({mode: "short"})
+    storage.set({
+      key: "settings",
+      value: JSON.stringify(this.settings),
+      success: () => prompt.showToast({message: "·已成功保存·"})
+    })
+  },
+  closeTips() {
+    vibrator.vibrate({mode: "long"})
+    this.tips = false
+    storage.set({
+      key: "tips",
+      value: JSON.stringify(61),
+      success: () => {}
+    })
+  },
+  pushMoreCheck() {
+    this.ssChick++
+    if (this.ssChick % 5 === 0) {
+      prompt.showToast({message: "杰哥不要啦~"})
+    }
+  },
+  buzz(e) {
+    this.settings.bzz = e.checked
+  }
+}
+</script>
+
+<style>
+/* ========== 全局 ========== */
+.root {
+  width: 192px;
+  height: 490px;
+  background-color: black;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 页面容器（绝对定位，用于滑动切换） */
+.page {
+  width: 192px;
+  height: 490px;
+}
+
+/* 背景图片铺满 */
+.page-bg {
+  width: 192px;
+  height: 490px;
+  position: absolute;
+}
+
+/* Flex 居中辅助 */
+.flex-center {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+/* 主菜单按钮列表 */
+.btn-list {
+  flex-direction: column;
+  align-items: center;
+  top: -40px;
+}
+
+/* 按钮通用样式 */
+.btn {
+  font-size: 18px;
+  font-weight: bold;
+  color: #7c7041;
+  background-color: rgba(230, 193, 214, 0.8);
+  border: 2px solid white;
+  border-radius: 16px;
+  padding: 2px 20px;
+  text-align: center;
+  width: 120px;
+  height: 40px;
+}
+
+/* 设置/存档/菜单按钮 */
+.menu-btn {
+  width: 160px;
+  padding: 12px;
+  background-color: rgba(247, 126, 197, 0.75);
+  color: white;
+  font-size: 22px;
+  font-weight: bold;
+  text-align: center;
+  border: 2px solid rgba(201, 64, 148, 0.5);
+  border-radius: 20px;
+  margin-bottom: 15px;
+}
+
+/* 可滚动区域 */
+.page-scroll {
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 设置行 */
+.setting-group {
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-start;
+  width: 100%;
+  height: 60px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  padding: 0 12px;
+  margin-bottom: 8px;
+}
+
+.setting-label {
+  font-size: 24px;
+  color: white;
+  font-weight: 500;
+  text-align: left;
+  width: 100%;
+}
+
+.setting-value {
+  font-size: 22px;
+  color: rgba(255, 255, 255, 0.7);
+  text-align: right;
+  width: 100%;
+}
+
+/* 滑块 */
+.slider {
+  width: 160px;
+  margin: 8px 0;
+}
+
+/* 顶部固定栏（设置/关于页） */
+.top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 192px;
+  height: 48px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  background-color: rgba(0, 0, 0, 0.6);
+}
+
+.top-btn {
+  width: 36px;
+  height: 36px;
+}
+
+.top-title {
+  font-size: 24px;
+  color: white;
+  font-weight: bold;
+}
+
+/* 关于页卡片 */
+.about-card {
+  width: 100%;
+  background-color: rgba(38, 38, 38, 0.9);
+  border-radius: 20px;
+  padding: 16px;
+  margin-bottom: 20px;
+  flex-direction: column;
+}
+
+.about-title {
+  font-size: 30px;
+  color: white;
+  font-weight: bold;
+}
+
+.about-ver {
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 8px;
+}
+
+.about-dev-title {
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 12px 0 8px 0;
+}
+
+.dev-row {
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.dev-name {
+  font-size: 26px;
+  color: white;
+  margin-right: 8px;
+}
+
+.about-note {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 12px;
+  font-style: italic;
+}
+
+/* 提示弹窗 */
+.tips-box {
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  background-color: white;
+  border-radius: 20px;
+  width: 170px;
+}
+
+.font24 {
+  font-size: 22px;
+  color: #9b1441b7;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 8px;
+}
+.safearea {
+  height: 70px;
+}
+</style>

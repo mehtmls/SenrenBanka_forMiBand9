@@ -1,0 +1,33 @@
+{
+  "package": "com.band9.SenrenBanka",
+  "name": "千恋*万花",
+  "versionName": "1.91.9810",
+  "versionCode": 114514,
+  "minPlatformVersion": 1000,
+  "icon": "/common/logo.png",
+  "deviceTypeList": [
+    "watch"
+  ],
+  "features": [
+    {"name": "system.router"},
+    {"name": "system.storage"},
+    {"name": "system.prompt"},
+    {"name": "system.file"},
+    { "name": "system.vibrator" }
+  ],
+  "config": {
+    "logLevel": "log",
+    "designWidth": 192
+  },
+  "router": {
+    "entry": "pages/index",
+    "pages": {
+      "pages/index": {
+        "component": "index"
+      },
+      "pages/detail": {
+        "component": "detail"
+      }
+    }
+  }
+}
