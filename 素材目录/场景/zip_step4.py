@@ -43,7 +43,7 @@ def deal_block(block, current_file, lang_index=2):
             text_list = item.get('text', [])
             if lang_index < len(text_list) and isinstance(text_list[lang_index], list):
                 text = text_list[lang_index][1] if len(text_list[lang_index]) > 1 else ""
-                character = text_list[lang_index][0] if len(text_list[lang_index]) > 1 else ""
+                character = text_list[lang_index][0] if isinstance(text_list[lang_index][0],str) else ""
             else:
                 text = ""
 
